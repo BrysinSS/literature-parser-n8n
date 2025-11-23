@@ -1,0 +1,282 @@
+{
+  "name": "My workflow 1",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -32
+      ],
+      "id": "1377e095-fa88-41ac-8dec-cbb7dff7f127",
+      "name": "Start Stage A"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"topics\": [\n    {\n      \"topic_id\": \"T01\",\n      \"topic_query\": \"functional measure cylindrical measure projective limit measure Kolmogorov extension theorem Gaussian measure infinite dimensional Minlos theorem Osterwalder–Schrader\"\n    },\n    {\n      \"topic_id\": \"T02\",\n      \"topic_query\": \"measure on spaces of connections gauge-invariant measure noncompact group functional integration Bochner–Minlos Radon measures topological vector spaces white noise measure\"\n    },\n    {\n      \"topic_id\": \"T03\",\n      \"topic_query\": \"gauge orbit space A/G non-symmetric gauge configurations Gribov ambiguity Gribov region functional measure stratified gauge orbit space slice theorem gauge theories\"\n    },\n    {\n      \"topic_id\": \"T04\",\n      \"topic_query\": \"BRST quantization nilpotent BRST operator Faddeev–Popov determinant BRST cohomology BRST-invariant measure BV formalism Batalin–Vilkovisky\"\n    },\n    {\n      \"topic_id\": \"T05\",\n      \"topic_query\": \"self-adjointness unbounded operators essential self-adjointness Nelson criterion Kato–Rellich self-adjoint extension domain of unbounded operators Hamiltonian constraint\"\n    },\n    {\n      \"topic_id\": \"T06\",\n      \"topic_query\": \"infinite-dimensional manifold measure Banach space valued measures Fréchet space measure theory Sobolev spaces gauge theory functional analytic approach QFT\"\n    },\n    {\n      \"topic_id\": \"T07\",\n      \"topic_query\": \"Dirac quantization constraints Wheeler–DeWitt operator constraint algebra closure refined algebraic quantization master constraint programme diffeomorphism constraint\"\n    },\n    {\n      \"topic_id\": \"T08\",\n      \"topic_query\": \"Ashtekar–Lewandowski measure projective techniques LQG holonomy–flux algebra quantum geometry measure construction non-separable Hilbert space LQG Fleischhack measure\"\n    },\n    {\n      \"topic_id\": \"T09\",\n      \"topic_query\": \"microlocal analysis QFT functional differential equations measure variational methods gauge theory elliptic operators infinite dimensional semiclassical analysis constraints topological obstructions gauge measure\"\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        656,
+        -32
+      ],
+      "id": "def4c18f-5141-4a6c-a643-0c845f485d28",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём массив topics из входного item\nconst topics = $json.topics;\n\n// Превращаем массив тем в массив items\nreturn topics.map(t => ({ json: t }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        -32
+      ],
+      "id": "2c9280d6-ecc1-4620-bb6e-2fe85d0e0d03",
+      "name": "ExpandTopics"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.crossref.org/works?query={{$json.topic_query}}&rows=20\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        976,
+        -32
+      ],
+      "id": "ee6b66e4-82b2-40cd-b4d9-4a8177a2677d",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем все входные items (ответы Crossref)\nconst all = $input.all();\n\n// Загружаем темы из ноды ExpandTopics (по индексам)\nconst topics = $items(\"ExpandTopics\").map(x => x.json);\n\nconst results = all.map(({ json }, index) => {\n\n  const { topic_id, topic_query } = topics[index];\n\n  const items = json.message?.items || [];\n\n  const normalized = items.map(paper => {\n    return {\n      doi: paper.DOI || null,\n      title: paper.title?.[0] || null,\n\n      year:\n        paper[\"published-print\"]?.[\"date-parts\"]?.[0]?.[0] ||\n        paper[\"published-online\"]?.[\"date-parts\"]?.[0]?.[0] ||\n        null,\n\n      journal: paper[\"container-title\"]?.[0] || null,\n\n      authors: (paper.author || []).map(a => {\n        const given = a.given || \"\";\n        const family = a.family || \"\";\n        return `${given} ${family}`.trim();\n      }),\n\n      url: paper.URL || null,\n      source: \"crossref\",\n\n      // Прокидываем тему внутрь статьи\n      topic_id,\n      topic_query,\n    };\n  });\n\n  return {\n    json: {\n      topic_id,\n      topic_query,\n      articles_crossref: normalized\n    }\n  };\n});\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        -32
+      ],
+      "id": "4b457783-a99a-4215-b1fc-4f3e0b59bf94",
+      "name": "Normalize Crossref"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.openalex.org/works?search={{$json.topic_query}}&per-page=20",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1312,
+        -32
+      ],
+      "id": "e125a379-bb97-4cfc-810a-47d4acc301a0",
+      "name": "OpenAlex"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем ответы OpenAlex\nconst all = $input.all();\n\n// Загружаем темы из ExpandTopics\nconst topics = $items(\"ExpandTopics\").map(x => x.json);\n\nconst results = all.map(({ json }, index) => {\n\n  const { topic_id, topic_query } = topics[index];\n\n  const items = json.results || [];\n\n  const normalized = items.map(paper => ({\n    doi: paper.doi || null,\n    title: paper.title || null,\n    year: paper.publication_year || null,\n    journal: paper.host_venue?.display_name || null,\n    authors: (paper.authorships || []).map(a => a.author?.display_name || null),\n    url: paper.id || null,\n    source: \"openalex\",\n\n    topic_id,\n    topic_query,\n  }));\n\n  return {\n    json: {\n      topic_id,\n      topic_query,\n      articles_openalex: normalized\n    }\n  };\n});\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -32
+      ],
+      "id": "f773755a-bdcb-4cb5-99a1-274dadb5f968",
+      "name": "Normalize OpenAlex"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём ВСЕ items из нод Normalize Crossref и Normalize OpenAlex\n// В твоей версии n8n так надёжнее, чем через $node[\"...\"].json\n\nconst crossrefItems = $items(\"Normalize Crossref\", 0).map(i => i.json);\nconst openalexItems = $items(\"Normalize OpenAlex\", 0).map(i => i.json);\n\n// crossrefItems ~ [ { articles_crossref: [...] }, { articles_crossref: [...] } ]\n// openalexItems ~ [ { articles_openalex: [...] }, { articles_openalex: [...] } ]\n\nconst results = [];\n\n// Считаем по количеству тем — обычно 2 (T01, T02)\nconst count = Math.max(crossrefItems.length, openalexItems.length);\n\nfor (let i = 0; i < count; i++) {\n  const crItem = crossrefItems[i] || {};\n  const oaItem = openalexItems[i] || {};\n\n  const cr = crItem.articles_crossref || [];\n  const oa = oaItem.articles_openalex || [];\n\n  // Достаём topic_id и topic_query из любой доступной статьи\n  let topic_id = null;\n  let topic_query = null;\n\n  if (cr.length > 0) {\n    topic_id = cr[0].topic_id || null;\n    topic_query = cr[0].topic_query || null;\n  } else if (oa.length > 0) {\n    topic_id = oa[0].topic_id || null;\n    topic_query = oa[0].topic_query || null;\n  }\n\n  results.push({\n    json: {\n      topic_id,\n      topic_query,\n      articles: [\n        ...cr,\n        ...oa,\n      ],\n    },\n  });\n}\n\n// Возвращаем по одному item на каждую тему\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        -32
+      ],
+      "id": "28133db3-3160-4a42-bfa7-75442ee99ac0",
+      "name": "MergePerTopic"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Собираем все items, пришедшие от MergePerTopic\nconst perTopic = $input.all();\n\n// Объединяем массивы статей всех тем\nlet all = [];\nfor (const { json } of perTopic) {\n  if (Array.isArray(json.articles)) {\n    all = all.concat(json.articles);\n  }\n}\n\n// Возвращаем один item — глобальный массив статей\nreturn [\n  {\n    json: {\n      articles: all\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        -32
+      ],
+      "id": "afca29e7-ed80-4591-b2e6-a6761bf1188c",
+      "name": "CollectAllArticles"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Получаем глобальный массив статей\nconst input = $input.item.json.articles || [];\n\n// Объект для хранения по canonical_doi\nconst map = {};\n\nfor (const a of input) {\n  // canonical_doi — главный идентификатор\n  let canonical = null;\n\n  if (a.doi) {\n    canonical = a.doi.toLowerCase().trim();\n  } else if (a.title) {\n    canonical = a.title.toLowerCase().trim();\n  } else {\n    continue; // нечего дедуплицировать\n  }\n\n  // Если ещё нет такого DOI в карте — создаём\n  if (!map[canonical]) {\n    map[canonical] = {\n      canonical_doi: canonical,\n      doi: a.doi || null,\n      title: a.title || null,\n      year: a.year || null,\n      journal: a.journal || null,\n      authors: a.authors || [],\n      url: a.url || null,\n      topic_id: a.topic_id || null,\n      topic_query: a.topic_query || null,\n      sources: [a.source],\n    };\n  } else {\n    // Уже есть — только добавляем источник\n    if (!map[canonical].sources.includes(a.source)) {\n      map[canonical].sources.push(a.source);\n    }\n  }\n}\n\n// Возвращаем 1 item\nreturn [\n  {\n    json: {\n      articles: Object.values(map)\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        -32
+      ],
+      "id": "daf49441-98c2-43b8-bb87-e2d61cb95f83",
+      "name": "DedupArticles"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "fileName": "articles.json"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        2192,
+        -32
+      ],
+      "id": "de862622-1963-46e5-960a-a3d7862cb187",
+      "name": "Convert to File"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start Stage A": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "ExpandTopics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ExpandTopics": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Normalize Crossref",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Crossref": {
+      "main": [
+        [
+          {
+            "node": "OpenAlex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAlex": {
+      "main": [
+        [
+          {
+            "node": "Normalize OpenAlex",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize OpenAlex": {
+      "main": [
+        [
+          {
+            "node": "MergePerTopic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MergePerTopic": {
+      "main": [
+        [
+          {
+            "node": "CollectAllArticles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CollectAllArticles": {
+      "main": [
+        [
+          {
+            "node": "DedupArticles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DedupArticles": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d8403352-e4e7-4e4e-8258-8bb0e024efbe",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3f59e7da63fb66b042071916a2938974a2b1812e8b49a294f4316417eacb429a"
+  },
+  "id": "hQvw5LISFoeqATJ6",
+  "tags": []
+}
