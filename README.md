@@ -1,65 +1,69 @@
-This repository contains an n8n workflow for automated collection and normalization of scientific articles from open sources such as Crossref and OpenAlex.
+# Literature Parser (n8n)
 
-The workflow allows you to define any number of research topics and automatically fetches relevant publications for each topic.
+This repository contains an n8n workflow for automated collection and
+normalization of scientific publications from open metadata sources.
 
-🔍 What the parser does
+The workflow fetches, normalizes, merges, and deduplicates articles
+based on user-defined research topics.
 
-Expands a list of user-defined topics
+---
 
-Sends API requests to Crossref and OpenAlex
+## Function
+- Input: list of research topics
+- Output: normalized articles.json file
+- Fully automated
+- No credentials required
 
-Normalizes returned metadata (DOI, title, year, authors, venue, URL)
+---
 
-Merges and deduplicates publications from both sources
+## Data Sources
+- Crossref
+- OpenAlex
 
-Produces a clean articles.json file with unique articles
+---
 
-The workflow is fully modular and does not require any credentials.
+## What the workflow does
+- Expands user-defined research topics
+- Queries open scientific metadata APIs
+- Normalizes article metadata:
+  DOI, title, year, authors, venue, URL
+- Merges and deduplicates results
+- Produces a clean list of unique articles
 
-⚙️ How to change the topics
+---
 
-Modify the n8n node:
+## Configuration
+Topics are defined directly in the workflow.
 
+Edit the node:
 Set → Edit Fields → jsonOutput
 
-Inside JSON, update the array:
+Update the topics array:
+- add or remove topics
+- broaden or narrow search queries
+- target specific research domains
 
-{
-  "topics": [
-    {
-      "topic_id": "T01",
-      "topic_query": "your search keywords"
-    },
-    ...
-  ]
-}
+---
 
+## Output
+The final dataset is produced as:
+articles.json
 
-You can:
+The workflow can be extended with storage nodes
+(e.g. filesystem, cloud storage) if persistence is required.
 
-add more topics,
+---
 
-remove topics,
+## Files
+- workflow/parser.json — n8n workflow definition
+- docs/workflow-preview.png — visual workflow diagram
 
-broaden the search queries,
+---
 
-or narrow them down to a specific domain.
+## Status
+Working workflow.
 
-📤 Exporting results
+---
 
-The final data is produced by the node:
-
-Convert to File → articles.json
-
-
-You may optionally attach any storage node (Google Drive, AWS S3, filesystem) to save it automatically.
-
-🖼 Workflow Preview
-
-A visual representation of the workflow is included in docs/workflow-preview.png.
-
-📦 Files in the repository
-workflow/
-  parser.json             → n8n workflow file
-docs/
-  workflow-preview.png    → visual representation of the workflow
+## Author
+Stanislav Brysin
